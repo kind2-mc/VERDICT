@@ -115,24 +115,11 @@
                     </appinfo>
                 </annotation>
             </element>
+            <element name="attribute" type="vdm_data:GenericAttribute"
+                minOccurs="0" maxOccurs="unbounded"></element>
         </choice>
         <attribute name="id" type="ID"></attribute>
         <attribute name="name" type="vdm_data:Identifier"></attribute>
-        <attributeGroup ref="vdm_model:STEMComponentProperties" />
-        <attribute name="heterogeneity" type="boolean"></attribute>
-        <attribute name="encryption" type="boolean"></attribute>
-        <attribute name="anti_jamming" type="boolean"></attribute>
-        <attribute name="anti_flooding" type="boolean"></attribute>
-        <attribute name="anti_fuzzing" type="boolean"></attribute>
-        <attribute name="heterogeneity_dal" type="int"></attribute>
-        <attribute name="encryption_dal" type="int"></attribute>
-        <attribute name="anti_jamming_dal" type="int"></attribute>
-        <attribute name="anti_flooding_dal" type="int"></attribute>
-        <attribute name="anti_fuzzing_dal" type="int"></attribute>
-        <attributeGroup
-            ref="vdm_model:InstrumentedComponentProperties">
-        </attributeGroup>
-        <attribute name="adversariallyTested" type="boolean"></attribute>
     </complexType>
 
     <complexType name="BlockImpl">
@@ -152,40 +139,15 @@
             <element name="source" type="vdm_model:ConnectionEnd"></element>
             <element name="destination" type="vdm_model:ConnectionEnd">
             </element>
+            <element name="attribute" type="vdm_data:GenericAttribute"
+                maxOccurs="unbounded" minOccurs="0"></element>
         </all>
         <attribute name="name" type="vdm_data:Identifier"
             use="required">
         </attribute>
-        <attribute name="flow" type="vdm_model:Flow" use="optional"></attribute>
-        <attribute name="data_encrypted" type="boolean"
-            use="optional">
-        </attribute>
-        <attribute name="authenticated" type="boolean"
-            use="optional"></attribute>
-        <attribute name="conn_type" type="vdm_model:ConnectionType"
-            use="optional"></attribute>
     </complexType>
 
-    <attributeGroup name="STEMComponentProperties">
-        <attribute name="hasSensitiveInfo" type="boolean"
-            use="optional">
-        </attribute>
-        <attribute name="insideTrustedBoundary" type="boolean"
-            use="optional">
-        </attribute>
-        <attribute name="broadcastFromOutsideTB" type="boolean"
-            use="optional"></attribute>
-        <attribute name="wifiFromOutsideTB" type="boolean"
-            use="optional"></attribute>
-    </attributeGroup>
 
-    <simpleType name="Flow">
-        <restriction base="string">
-            <enumeration value="Xdata"></enumeration>
-            <enumeration value="Control"></enumeration>
-            <enumeration value="Request"></enumeration>
-        </restriction>
-    </simpleType>
 
     <complexType name="ConnectionEnd">
         <choice>
@@ -228,48 +190,11 @@
         </sequence>
     </complexType>
 
-    <attributeGroup name="InstrumentedComponentProperties">
-        <attribute name="category" type="string" use="optional"></attribute>
-        <attribute name="component_type"
-            type="vdm_model:KindOfComponent" use="optional">
-        </attribute>
-        <attribute name="situated" type="vdm_model:SituatedType"
-            use="optional">
-        </attribute>
-        <attribute name="manufacturer"
-            type="vdm_model:ManufacturerType" use="optional"></attribute>
-    </attributeGroup>
 
 
-    <simpleType name="KindOfComponent">
-        <restriction base="string">
-            <enumeration value="Software"></enumeration>
-            <enumeration value="Hardware"></enumeration>
-            <enumeration value="Human"></enumeration>
-            <enumeration value="Hybrid"></enumeration>
-        </restriction>
-    </simpleType>
 
-    <simpleType name="SituatedType">
-        <restriction base="string">
-            <enumeration value="OnBoard"></enumeration>
-            <enumeration value="Remote"></enumeration>
-        </restriction>
-    </simpleType>
 
-    <simpleType name="ConnectionType">
-        <restriction base="string">
-            <enumeration value="Local"></enumeration>
-            <enumeration value="Remote"></enumeration>
-        </restriction>
-    </simpleType>
 
-    <simpleType name="ManufacturerType">
-        <restriction base="string">
-            <enumeration value="ThirdParty"></enumeration>
-            <enumeration value="InHouse"></enumeration>
-        </restriction>
-    </simpleType>
 
     <complexType name="CIAPort">
         <sequence>
