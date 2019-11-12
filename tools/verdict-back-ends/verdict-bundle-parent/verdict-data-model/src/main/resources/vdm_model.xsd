@@ -135,13 +135,13 @@
     </complexType>
 
     <complexType name="Connection">
-        <all>
+        <sequence>
             <element name="source" type="vdm_model:ConnectionEnd"></element>
-            <element name="destination" type="vdm_model:ConnectionEnd">
-            </element>
+            <element name="destination" type="vdm_model:ConnectionEnd"></element>
             <element name="attribute" type="vdm_data:GenericAttribute"
-                maxOccurs="unbounded" minOccurs="0"></element>
-        </all>
+                minOccurs="0" maxOccurs="unbounded">
+            </element>
+        </sequence>
         <attribute name="name" type="vdm_data:Identifier"
             use="required">
         </attribute>

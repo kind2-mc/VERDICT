@@ -2,6 +2,7 @@
 package edu.uiowa.clc.verdict.crv;
 
 import edu.uiowa.clc.verdict.vdm.instrumentor.VDMInstrumentor;
+import java.io.Serializable;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -10,6 +11,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
+import verdict.vdm.vdm_data.GenericAttribute;
 import verdict.vdm.vdm_model.BlockImpl;
 import verdict.vdm.vdm_model.CompInstancePort;
 import verdict.vdm.vdm_model.ComponentImpl;
@@ -17,9 +19,6 @@ import verdict.vdm.vdm_model.ComponentInstance;
 import verdict.vdm.vdm_model.ComponentType;
 import verdict.vdm.vdm_model.Connection;
 import verdict.vdm.vdm_model.ConnectionEnd;
-import verdict.vdm.vdm_model.ConnectionType;
-import verdict.vdm.vdm_model.KindOfComponent;
-import verdict.vdm.vdm_model.ManufacturerType;
 import verdict.vdm.vdm_model.Model;
 import verdict.vdm.vdm_model.Port;
 import verdict.vdm.vdm_model.PortMode;
@@ -235,13 +234,22 @@ public class Instrumentor extends VDMInstrumentor {
 
         return attack_type;
     }
+
     // LS:
     // - Select all components in the model M such that:
     // c.Component-Group = 'GPS' v 'IMU' v 'LIDAR'
+    // Generic Attribute
+    // Name: Category
+    // Type: String
+    // Value = GPS or IRU or DME_VOR
     @Override
     public void locationSpoofing(HashSet<ComponentType> vdm_components) {
 
         HashSet<String> components = new HashSet<String>();
+
+        final String GPS = "GPS";
+        final String DME_VOR = "DME_VOR";
+        final String IRU = "IRU";
 
         BlockImpl blockImpl = null;
 
@@ -269,17 +277,35 @@ public class Instrumentor extends VDMInstrumentor {
                         componentType = subcomponentImpl.getType();
                     }
 
-                    String component_group = componentInstance.getCategory();
-                    if (component_group == null) {
-                        component_group = "";
+                    List<GenericAttribute> attributeList = componentInstance.getAttribute();
+
+                    GenericAttribute g_attribute = searchAttribute(attributeList, "Category");
+
+                    if (g_attribute != null) {
+
+                        String component_category = (String) g_attribute.getValue();
+
+                        if (component_category.equalsIgnoreCase(GPS)
+                                || component_category.equalsIgnoreCase(DME_VOR)
+                                || component_category.equalsIgnoreCase(IRU)) {
+                            vdm_components.add(componentType);
+                            components.add(componentType.getId());
+                        }
                     }
 
-                    if (component_group.equals("GPS")
-                            || component_group.equals("DME_VOR")
-                            || component_group.equals("IRU")) {
-                        vdm_components.add(componentType);
-                        components.add(componentType.getId());
-                    }
+                    //                    String component_group = componentInstance.getCategory();
+                    //                    if (component_group == null) {
+                    //                        component_group = "";
+                    //                    }
+                    //
+                    //
+                    //                    if (component_group.equals("GPS")
+                    //                            || component_group.equals("DME_VOR")
+                    //                            || component_group.equals("IRU")) {
+                    //                        vdm_components.add(componentType);
+                    //                        components.add(componentType.getId());
+                    //                    }
+
                 }
             }
         }
@@ -300,9 +326,9 @@ public class Instrumentor extends VDMInstrumentor {
 
         // ArrayList<Connection> selected_channels = new ArrayList<Connection>();
 
-        boolean data_encryption = false;
-        boolean authentication = false;
         BlockImpl blockImpl = null;
+
+        final String REMOTE_CONNECTION = "Remote";
 
         for (ComponentImpl componentImpl : vdm_model.getComponentImpl()) {
             blockImpl = componentImpl.getBlockImpl();
@@ -312,16 +338,39 @@ public class Instrumentor extends VDMInstrumentor {
                 // Selection channels (Authentication = OFF & DataEncrypted = OFF)
                 for (Connection connection : blockImpl.getConnection()) {
                     // visit(connection, instrumented_channel);
-                    ConnectionType con_type = connection.getConnType();
-                    if (con_type == ConnectionType.REMOTE
-                            && connection.isDataEncrypted() == data_encryption
-                            && connection.isAuthenticated() == authentication) {
 
-                        // selected_channels.add(connection);
-                        // LOGGER.info("(" + connection_index++ + ") " +
-                        // connection.getName());
-                        vdm_links.add(connection);
-                        links.add(connection.getName());
+                    List<GenericAttribute> attributeList = connection.getAttribute();
+
+                    //                    ConnectionType con_type = connection.getConnType();
+
+                    GenericAttribute attribute1 = searchAttribute(attributeList, "ConnectionType");
+
+                    if (attribute1 != null) {
+                        String con_type = (String) attribute1.getValue();
+
+                        GenericAttribute attribute2 =
+                                searchAttribute(attributeList, "isDataEncrypted");
+
+                        if (attribute2 != null) {
+                            boolean encrypted = (boolean) attribute2.getValue();
+
+                            GenericAttribute attribute3 =
+                                    searchAttribute(attributeList, "isAuthenticated");
+
+                            if (attribute2 != null) {
+
+                                boolean authenticated = (boolean) attribute3.getValue();
+
+                                if (con_type == REMOTE_CONNECTION && !encrypted && !authenticated) {
+
+                                    // selected_channels.add(connection);
+                                    // LOGGER.info("(" + connection_index++ + ") " +
+                                    // connection.getName());
+                                    vdm_links.add(connection);
+                                    links.add(connection.getName());
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -370,15 +419,33 @@ public class Instrumentor extends VDMInstrumentor {
     // - Select components c in the model M such that:
     // c.ComponentType = 'Software' v c.ComponentType = 'Hybrid' & c.Manufacturer =
     // 'ThirdParty'
+
+    // Generic Attributes
+
+    // Name: KindOfComponent
+    // Type: String
+    // Value [Software] -- String Store {Software,Hybrid}
+
+    // Name: ManufacturerType
+    // Type: Enum
+    // Value = {ThirdParty,InHouse}
+
+    // Name: isAdversariallyTested
+    // Type: Boolean
+
     @Override
     public void logicBomb(HashSet<ComponentType> vdm_components) {
 
         HashSet<String> components = new HashSet<String>();
 
         // Conditions
-        KindOfComponent component_kind_cond_1 = KindOfComponent.SOFTWARE;
-        KindOfComponent component_kind_cond_2 = KindOfComponent.HYBRID;
-        ManufacturerType manufacturer_cond = ManufacturerType.THIRD_PARTY;
+        //        KindOfComponent component_kind_cond_1 = KindOfComponent.SOFTWARE;
+        //        KindOfComponent component_kind_cond_2 = KindOfComponent.HYBRID;
+        //        ManufacturerType manufacturer_cond = ManufacturerType.THIRD_PARTY;
+
+        final String SOFTWARE_COMPONENT = "Software";
+        final String HYBRID_COMPONENT = "Hybrid";
+        final String THIRDPARY_MANFUCTURE = "ThirdParty";
 
         BlockImpl blockImpl = null;
 
@@ -396,8 +463,10 @@ public class Instrumentor extends VDMInstrumentor {
                     componentType = componentInstance.getSpecification();
                     ComponentImpl subcomponentImpl = componentInstance.getImplementation();
 
-                    KindOfComponent kind_of_component = componentInstance.getComponentType();
-                    ManufacturerType manufacturer = componentInstance.getManufacturer();
+                    //                    KindOfComponent kind_of_component =
+                    // componentInstance.getComponentType();
+                    //                    ManufacturerType manufacturer =
+                    // componentInstance.getManufacturer();
 
                     // Option 1) Specification
                     if (componentType != null) {
@@ -409,22 +478,59 @@ public class Instrumentor extends VDMInstrumentor {
                         componentType = subcomponentImpl.getType();
                     }
 
-                    boolean comp_cond_3 = false;
+                    boolean adv_tested = false;
 
-                    if (componentInstance.isAdversariallyTested() != null) {
-                        comp_cond_3 = componentInstance.isAdversariallyTested();
+                    List<GenericAttribute> attributeList = componentInstance.getAttribute();
+
+                    GenericAttribute attribute1 =
+                            searchAttribute(attributeList, "isAdversariallyTested");
+
+                    if (attribute1 != null) {
+                        adv_tested = (boolean) attribute1.getValue();
+
+                        GenericAttribute attribute2 =
+                                searchAttribute(attributeList, "KindOfComponent");
+
+                        if (attribute2 != null) {
+                            String kind_of_component = (String) attribute2.getValue();
+
+                            GenericAttribute attribute3 =
+                                    searchAttribute(attributeList, "ManufacturerType");
+
+                            if (attribute3 != null) {
+                                String manufacturer = (String) attribute1.getValue();
+                                // condition
+                                //                            	if((kind_of_component ==
+                                // StringEnum.Software || kind_of_component == StringEnum.Hybrid) &&
+                                // manufacturer_cond == StringEnum.Hybrid && !comp_cond_3) {
+                                if ((kind_of_component.equalsIgnoreCase(SOFTWARE_COMPONENT)
+                                                || kind_of_component.equalsIgnoreCase(
+                                                        HYBRID_COMPONENT))
+                                        && manufacturer.equalsIgnoreCase(THIRDPARY_MANFUCTURE)
+                                        && !adv_tested) {
+                                    vdm_components.add(componentType);
+                                    components.add(componentType.getId());
+                                }
+                            }
+                        }
                     }
 
-                    if ((kind_of_component == component_kind_cond_1
-                                    || kind_of_component == component_kind_cond_2)
-                            && manufacturer == manufacturer_cond
-                            && !comp_cond_3) {
-                        // Store component
-                        // if (!vdm_components.contains(componentType)) {
-                        vdm_components.add(componentType);
-                        components.add(componentType.getId());
-                        // }
-                    }
+                    //                    if (componentInstance.isAdversariallyTested() != null) {
+                    //                        comp_cond_3 =
+                    // componentInstance.isAdversariallyTested();
+                    //                    }
+                    //
+                    //                    if ((kind_of_component == component_kind_cond_1
+                    //                                    || kind_of_component ==
+                    // component_kind_cond_2)
+                    //                            && manufacturer == manufacturer_cond
+                    //                            && !comp_cond_3) {
+                    //                        // Store component
+                    //                        // if (!vdm_components.contains(componentType)) {
+                    //                        vdm_components.add(componentType);
+                    //                        components.add(componentType.getId());
+                    //                        // }
+                    //                    }
                 }
             }
         }
@@ -446,9 +552,14 @@ public class Instrumentor extends VDMInstrumentor {
         HashSet<String> components = new HashSet<String>();
 
         // Conditions
-        KindOfComponent component_kind_cond_1 = KindOfComponent.SOFTWARE;
-        KindOfComponent component_kind_cond_2 = KindOfComponent.HYBRID;
-        ManufacturerType manufacturer_cond = ManufacturerType.THIRD_PARTY;
+        //        KindOfComponent component_kind_cond_1 = KindOfComponent.SOFTWARE;
+        //        KindOfComponent component_kind_cond_2 = KindOfComponent.HYBRID;
+        //        ManufacturerType manufacturer_cond = ManufacturerType.THIRD_PARTY;
+
+        final String SOFTWARE_COMPONENT = "Software";
+        final String HYBRID_COMPONENT = "Hybrid";
+        final String THIRDPARY_MANFUCTURE = "ThirdParty";
+        final String REMOTE_CONNECTION = "Remote";
 
         BlockImpl blockImpl = null;
 
@@ -466,8 +577,10 @@ public class Instrumentor extends VDMInstrumentor {
                     componentType = componentInstance.getSpecification();
                     ComponentImpl subcomponentImpl = componentInstance.getImplementation();
 
-                    KindOfComponent kind_of_component = componentInstance.getComponentType();
-                    ManufacturerType manufacturer = componentInstance.getManufacturer();
+                    //                    KindOfComponent kind_of_component =
+                    // componentInstance.getComponentType();
+                    //                    ManufacturerType manufacturer =
+                    // componentInstance.getManufacturer();
 
                     // Option 1) Specification
                     if (componentType != null) {
@@ -479,35 +592,60 @@ public class Instrumentor extends VDMInstrumentor {
                         componentType = subcomponentImpl.getType();
                     }
 
-                    if ((kind_of_component == component_kind_cond_1
-                                    || kind_of_component == component_kind_cond_2)
-                            && manufacturer == manufacturer_cond) {
+                    List<GenericAttribute> attributeList = componentInstance.getAttribute();
+                    GenericAttribute attribute1 = searchAttribute(attributeList, "KindOfComponent");
 
-                        // Port
-                        for (Port port : componentType.getPort()) {
-                            // System.out.print("(" + port_index + ") ");
+                    if (attribute1 != null) {
+                        String kind_of_component = (String) attribute1.getValue();
 
-                            PortMode mode = port.getMode();
-                            if (mode == PortMode.IN) {
-                                // Google code style intent add error here.
-                                for (Connection con : blockImpl.getConnection()) {
+                        GenericAttribute attribute2 =
+                                searchAttribute(attributeList, "ManufacturerType");
 
-                                    ConnectionType con_type = con.getConnType();
+                        if (attribute2 != null) {
+                            String manufacturer = (String) attribute1.getValue();
 
-                                    if (con_type == ConnectionType.REMOTE) {
+                            if ((kind_of_component.equalsIgnoreCase(SOFTWARE_COMPONENT)
+                                            || kind_of_component.equalsIgnoreCase(HYBRID_COMPONENT))
+                                    && manufacturer.equalsIgnoreCase(THIRDPARY_MANFUCTURE)) {
 
-                                        ConnectionEnd src_con = con.getSource();
-                                        Port src_port = src_con.getComponentPort();
+                                // Port
+                                for (Port port : componentType.getPort()) {
+                                    // System.out.print("(" + port_index + ") ");
 
-                                        if (src_port == null) {
-                                            CompInstancePort compPort =
-                                                    src_con.getSubcomponentPort();
-                                            src_port = compPort.getPort();
-                                        }
+                                    PortMode mode = port.getMode();
+                                    if (mode == PortMode.IN) {
+                                        // Google code style intent add error here.
+                                        for (Connection con : blockImpl.getConnection()) {
 
-                                        if (port == src_port) {
-                                            vdm_components.add(componentType);
-                                            components.add(componentType.getId());
+                                            //				                                    ConnectionType
+                                            // con_type = con.getConnType();
+                                            List<GenericAttribute> attributeList1 =
+                                                    con.getAttribute();
+
+                                            GenericAttribute attribute3 =
+                                                    searchAttribute(
+                                                            attributeList1, "ConnectionType");
+
+                                            if (attribute1 != null) {
+                                                String con_type = (String) attribute3.getValue();
+
+                                                if (con_type.equalsIgnoreCase(REMOTE_CONNECTION)) {
+
+                                                    ConnectionEnd src_con = con.getSource();
+                                                    Port src_port = src_con.getComponentPort();
+
+                                                    if (src_port == null) {
+                                                        CompInstancePort compPort =
+                                                                src_con.getSubcomponentPort();
+                                                        src_port = compPort.getPort();
+                                                    }
+
+                                                    if (port == src_port) {
+                                                        vdm_components.add(componentType);
+                                                        components.add(componentType.getId());
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -534,8 +672,12 @@ public class Instrumentor extends VDMInstrumentor {
         HashSet<String> components = new HashSet<String>();
 
         // Conditions
-        KindOfComponent component_kind_cond_1 = KindOfComponent.SOFTWARE;
-        KindOfComponent component_kind_cond_2 = KindOfComponent.HYBRID;
+        //        KindOfComponent component_kind_cond_1 = KindOfComponent.SOFTWARE;
+        //        KindOfComponent component_kind_cond_2 = KindOfComponent.HYBRID;
+
+        final String SOFTWARE_COMPONENT = "Software";
+        final String HYBRID_COMPONENT = "Hybrid";
+        final String REMOTE_CONNECTION = "Remote";
 
         BlockImpl blockImpl = null;
 
@@ -553,7 +695,8 @@ public class Instrumentor extends VDMInstrumentor {
                     componentType = componentInstance.getSpecification();
                     ComponentImpl subcomponentImpl = componentInstance.getImplementation();
 
-                    KindOfComponent kind_of_component = componentInstance.getComponentType();
+                    //                    KindOfComponent kind_of_component =
+                    // componentInstance.getComponentType();
 
                     // Option 1) Specification
                     if (componentType != null) {
@@ -565,34 +708,60 @@ public class Instrumentor extends VDMInstrumentor {
                         componentType = subcomponentImpl.getType();
                     }
 
-                    if ((kind_of_component == component_kind_cond_1
-                            || kind_of_component == component_kind_cond_2)) {
+                    List<GenericAttribute> attributeList = componentInstance.getAttribute();
 
-                        // Port
-                        for (Port port : componentType.getPort()) {
-                            // System.out.print("(" + port_index + ") ");
+                    GenericAttribute attribute1 = searchAttribute(attributeList, "KindOfComponent");
 
-                            PortMode mode = port.getMode();
-                            if (mode == PortMode.IN) {
-                                // Google code style add errror in here
-                                for (Connection con : blockImpl.getConnection()) {
+                    if (attribute1 != null) {
+                        String kind_of_component = (String) attribute1.getValue();
 
-                                    ConnectionType con_type = con.getConnType();
+                        if (kind_of_component.equalsIgnoreCase(SOFTWARE_COMPONENT)
+                                || kind_of_component.equalsIgnoreCase(HYBRID_COMPONENT)) {
 
-                                    if (con_type == ConnectionType.REMOTE) {
+                            //                    if ((kind_of_component == component_kind_cond_1
+                            //                            || kind_of_component ==
+                            // component_kind_cond_2)) {
 
-                                        ConnectionEnd src_con = con.getSource();
-                                        Port src_port = src_con.getComponentPort();
+                            // Port
+                            for (Port port : componentType.getPort()) {
+                                // System.out.print("(" + port_index + ") ");
 
-                                        if (src_port == null) {
-                                            CompInstancePort compPort =
-                                                    src_con.getSubcomponentPort();
-                                            src_port = compPort.getPort();
-                                        }
+                                PortMode mode = port.getMode();
+                                if (mode == PortMode.IN) {
+                                    // Google code style add errror in here
+                                    for (Connection con : blockImpl.getConnection()) {
 
-                                        if (port == src_port) {
-                                            vdm_components.add(componentType);
-                                            components.add(componentType.getId());
+                                        //	                                    ConnectionType
+                                        // con_type = con.getConnType();
+                                        //	                                    ConnectionType
+                                        // con_type = con.getConnType();
+                                        List<GenericAttribute> attributeList1 = con.getAttribute();
+
+                                        GenericAttribute attribute3 =
+                                                searchAttribute(attributeList1, "ConnectionType");
+
+                                        if (attribute1 != null) {
+                                            String con_type = (String) attribute3.getValue();
+
+                                            if (con_type.equalsIgnoreCase(REMOTE_CONNECTION)) {
+
+                                                //	                                    if (con_type
+                                                // == ConnectionType.REMOTE) {
+
+                                                ConnectionEnd src_con = con.getSource();
+                                                Port src_port = src_con.getComponentPort();
+
+                                                if (src_port == null) {
+                                                    CompInstancePort compPort =
+                                                            src_con.getSubcomponentPort();
+                                                    src_port = compPort.getPort();
+                                                }
+
+                                                if (port == src_port) {
+                                                    vdm_components.add(componentType);
+                                                    components.add(componentType.getId());
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -602,7 +771,6 @@ public class Instrumentor extends VDMInstrumentor {
                 }
             }
         }
-
         this.attack_cmp_link_map.put("RI", components);
 
         //		return components;
@@ -616,10 +784,13 @@ public class Instrumentor extends VDMInstrumentor {
 
         HashSet<String> components = new HashSet<String>();
 
-        KindOfComponent component_kind_cond_1 = KindOfComponent.HARDWARE;
-        KindOfComponent component_kind_cond_2 = KindOfComponent.HYBRID;
+        //        KindOfComponent component_kind_cond_1 = KindOfComponent.HARDWARE;
+        //        KindOfComponent component_kind_cond_2 = KindOfComponent.HYBRID;
+        //        ManufacturerType manufacturer_cond = ManufacturerType.THIRD_PARTY;
 
-        ManufacturerType manufacturer_cond = ManufacturerType.THIRD_PARTY;
+        final String SOFTWARE_COMPONENT = "Hardware";
+        final String HYBRID_COMPONENT = "Hybrid";
+        final String THIRDPARY_MANFUCTURE = "ThirdParty";
 
         BlockImpl blockImpl = null;
 
@@ -634,18 +805,42 @@ public class Instrumentor extends VDMInstrumentor {
 
                 for (ComponentInstance componentInstance : blockImpl.getSubcomponent()) {
 
-                    KindOfComponent kind_of_component = componentInstance.getComponentType();
-                    ManufacturerType manufacturer = componentInstance.getManufacturer();
+                    //
+                    //                    KindOfComponent kind_of_component =
+                    // componentInstance.getComponentType();
+                    //                    ManufacturerType manufacturer =
+                    // componentInstance.getManufacturer();
 
                     componentType = getType(componentInstance);
 
-                    if ((kind_of_component == component_kind_cond_1
-                                    || kind_of_component == component_kind_cond_2)
-                            && manufacturer == manufacturer_cond) {
-                        // Store component
-                        vdm_components.add(componentType);
-                        components.add(componentType.getId());
-                        // instrument_component(componentType, blockImpl);
+                    List<GenericAttribute> attributeList = componentInstance.getAttribute();
+                    GenericAttribute attribute1 = searchAttribute(attributeList, "KindOfComponent");
+
+                    if (attribute1 != null) {
+                        String kind_of_component = (String) attribute1.getValue();
+
+                        GenericAttribute attribute2 =
+                                searchAttribute(attributeList, "ManufacturerType");
+
+                        if (attribute2 != null) {
+                            String manufacturer = (String) attribute1.getValue();
+
+                            if ((kind_of_component.equalsIgnoreCase(SOFTWARE_COMPONENT)
+                                            || kind_of_component.equalsIgnoreCase(HYBRID_COMPONENT))
+                                    && manufacturer.equalsIgnoreCase(THIRDPARY_MANFUCTURE)) {
+
+                                //                    if ((kind_of_component ==
+                                // component_kind_cond_1
+                                //                                    || kind_of_component ==
+                                // component_kind_cond_2)
+                                //                            && manufacturer == manufacturer_cond)
+                                // {
+                                // Store component
+                                vdm_components.add(componentType);
+                                components.add(componentType.getId());
+                                // instrument_component(componentType, blockImpl);
+                            }
+                        }
                     }
                 }
             }
@@ -664,8 +859,9 @@ public class Instrumentor extends VDMInstrumentor {
 
         HashSet<String> components = new HashSet<String>();
 
-        KindOfComponent component_kind_cond_1 = KindOfComponent.HUMAN;
-        boolean boundary_cond = false;
+        //        KindOfComponent component_kind_cond_1 = KindOfComponent.HUMAN;
+        final String HUMAN_COMPONENT = "Human";
+
         BlockImpl blockImpl = null;
 
         for (ComponentImpl componentImpl : vdm_model.getComponentImpl()) {
@@ -679,17 +875,33 @@ public class Instrumentor extends VDMInstrumentor {
 
                 for (ComponentInstance componentInstance : blockImpl.getSubcomponent()) {
 
-                    KindOfComponent kind_of_component = componentInstance.getComponentType();
+                    //                    KindOfComponent kind_of_component =
+                    // componentInstance.getComponentType();
 
                     componentType = getType(componentInstance);
 
-                    if (kind_of_component == component_kind_cond_1
-                            && componentInstance.isInsideTrustedBoundary() == boundary_cond) {
-                        // Store component
-                        vdm_components.add(componentType);
-                        components.add(componentType.getId());
+                    List<GenericAttribute> attributeList = componentInstance.getAttribute();
 
-                        // instrument_component(componentType, blockImpl);
+                    GenericAttribute attribute1 = searchAttribute(attributeList, "KindOfComponent");
+
+                    if (attribute1 != null) {
+                        String kind_of_component = (String) attribute1.getValue();
+
+                        GenericAttribute attribute2 =
+                                searchAttribute(attributeList, "isInsideTrustedBoundary");
+
+                        if (attribute2 != null) {
+                            boolean trusted_boundry = (boolean) attribute1.getValue();
+
+                            if (kind_of_component.equalsIgnoreCase(HUMAN_COMPONENT)
+                                    && !trusted_boundry) {
+                                // Store component
+                                vdm_components.add(componentType);
+                                components.add(componentType.getId());
+
+                                // instrument_component(componentType, blockImpl);
+                            }
+                        }
                     }
                 }
             }
@@ -706,8 +918,9 @@ public class Instrumentor extends VDMInstrumentor {
 
         HashSet<String> components = new HashSet<String>();
 
-        KindOfComponent component_kind_cond_1 = KindOfComponent.HUMAN;
-        boolean boundary_cond = true;
+        //        KindOfComponent component_kind_cond_1 = KindOfComponent.HUMAN;
+        final String HUMAN_COMPONENT = "Human";
+
         BlockImpl blockImpl = null;
 
         for (ComponentImpl componentImpl : vdm_model.getComponentImpl()) {
@@ -721,21 +934,42 @@ public class Instrumentor extends VDMInstrumentor {
 
                 for (ComponentInstance componentInstance : blockImpl.getSubcomponent()) {
 
-                    KindOfComponent kind_of_component = componentInstance.getComponentType();
+                    //                    KindOfComponent kind_of_component =
+                    // componentInstance.getComponentType();
 
                     componentType = getType(componentInstance);
+                    List<GenericAttribute> attributeList = componentInstance.getAttribute();
 
-                    if (kind_of_component == component_kind_cond_1
-                            && componentInstance.isInsideTrustedBoundary() == boundary_cond) {
-                        // Store component
-                        vdm_components.add(componentType);
-                        components.add(componentType.getId());
-                        // instrument_component(componentType, blockImpl);
+                    GenericAttribute attribute1 = searchAttribute(attributeList, "KindOfComponent");
+
+                    if (attribute1 != null) {
+                        String kind_of_component = (String) attribute1.getValue();
+
+                        GenericAttribute attribute2 =
+                                searchAttribute(attributeList, "isInsideTrustedBoundary");
+
+                        if (attribute2 != null) {
+                            boolean trusted_boundry = (boolean) attribute1.getValue();
+
+                            if (kind_of_component.equalsIgnoreCase(HUMAN_COMPONENT)
+                                    && trusted_boundry) {
+                                // Store component
+                                vdm_components.add(componentType);
+                                components.add(componentType.getId());
+                                // instrument_component(componentType, blockImpl);
+                            }
+                        }
                     }
                 }
             }
         }
 
         this.attack_cmp_link_map.put("IT", components);
+    }
+
+    public interface MetaDataKey<T extends Serializable> extends Serializable {
+        Class<T> getType();
+
+        String getName();
     }
 }
