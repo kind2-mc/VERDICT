@@ -58,9 +58,10 @@ let mk_package_section header_items body_items =
 %token AADLBOOLEAN AADLSTRING AADLINTEGER AADLREAL ENUMERATION
 %token PROPERTY SET IS APPLIES TO INHERIT EXTENDS
 %token PACKAGE SYSTEM ABSTRACT IMPLEMENTATION FEATURES PROPERTIES
-%token SUBCOMPONENTS CONNECTIONS SUBPROGRAM
+%token SUBCOMPONENTS CONNECTIONS
+%token PROCESS THREAD SUBPROGRAM PROCESSOR MEMORY DEVICE
 %token PROVIDES REQUIRES ACCESS PUBLIC PRIVATE RENAMES
-%token TYPE NONE UNITS WITH OUT IN CONSTANT VIRTUAL GROUP
+%token TYPE NONE UNITS WITH OUT IN CONSTANT VIRTUAL GROUP EVENT
 %token LIST OF
 %token DATA PORT BUS
 %token <Lexing.lexbuf>ANNEX
@@ -182,7 +183,7 @@ component_type:
   (* INCOMPLETE *)
 
 system_type:
-  system_or_abstract pid = ident
+  system_or_like pid = ident
   fs = sys_features_section
   annexes = list(annex_subclause)
   (* INCOMPLETE *)
@@ -201,10 +202,24 @@ sys_features_section:
 
 sys_feature:
   | dp = data_port { dp }
+  | ep = event_port { ep }
+  | da = data_access
+  {
+    let pdir =
+      match da.A.adir with
+      | A.Requires -> A.In
+      | A.Provides -> A.Out
+    in
+    { A.name = da.A.name;
+      A.dir = pdir;
+      A.dtype = da.A.dtype;
+      A.properties = da.A.properties;
+    }
+  }
   (* INCOMPLETE *)
 
 data_port:
-  pid = port_id; pdir = port_direction; DATA PORT
+  pid = port_id; pdir = port_direction; EVENT? DATA PORT
   qcr = option(qcref); (* aadl2::DataSubcomponentType *)
   prop_assocs = property_associations
   (* INCOMPLETE *)
@@ -216,7 +231,19 @@ data_port:
       A.properties = prop_assocs;
     }
   }
+
+event_port:
+  pid = port_id; pdir = port_direction; EVENT PORT
+  prop_assocs = property_associations
   (* INCOMPLETE *)
+  ";"
+  {
+    { A.name = pid;
+      A.dir = pdir;
+      A.dtype = None;
+      A.properties = prop_assocs;
+    }
+  }
 
 port_id:
   | pid = ident ":" { pid }
@@ -233,7 +260,7 @@ component_implementation:
   (* INCOMPLETE *)
 
 system_implementation:
-  system_or_abstract IMPLEMENTATION
+  system_or_like IMPLEMENTATION
   rlz = realization "." pid = iname
   subcomps = system_subcomponents_section
   connections = sys_connections_section
@@ -336,7 +363,7 @@ data_subcomponent:
   }
 
 system_subcomponent:
-  pid = subcomponent_id system_or_abstract
+  pid = subcomponent_id system_or_like
   type_ref = option(subcomponent_type_ref)
   prop_assocs = contained_property_associations
   (* INCOMPLETE *)
@@ -579,12 +606,14 @@ data_feature:
 data_access:
   pid = ident ":" ad = access_direction;
   DATA ACCESS qcr = option(qcref) (* aadl2::DataSubcomponentType *)
+  prop_assocs = component_properties
   (* INCOMPLETE *)
   ";"
   {
     { A.name = pid;
       A.adir = ad;
       A.dtype = qcr;
+      A.properties = prop_assocs;
     }
   }
 
@@ -675,14 +704,21 @@ metaclass_name:
   | ID {}
 
 core_keyword:
-  | system_or_abstract {}
+  | system_or_like {}
   | CONNECTIONS {}
   | PORT {}
   (* INCOMPLETE *)
 
-system_or_abstract:
+system_or_like:
   | SYSTEM {}
   | ABSTRACT {}
+  | PROCESS {}
+  | THREAD GROUP? {}
+  | SUBPROGRAM GROUP? {}
+  | DEVICE {}
+  | VIRTUAL? BUS {}
+  | VIRTUAL? PROCESSOR {}
+  | MEMORY {}
 
 (*
 qm_reference:

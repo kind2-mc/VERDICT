@@ -43,6 +43,11 @@
     "system",         P.SYSTEM ;
     "abstract",       P.ABSTRACT ;
     "subprogram",     P.SUBPROGRAM ;
+    "process",        P.PROCESS ;
+    "thread",         P.THREAD ;
+    "processor",      P.PROCESSOR ;
+    "memory",         P.MEMORY ;
+    "device",         P.DEVICE ;
     "implementation", P.IMPLEMENTATION ;
     "features",       P.FEATURES ;
     "properties",     P.PROPERTIES ;
@@ -57,6 +62,7 @@
     "constant",       P.CONSTANT ;
     "virtual",        P.VIRTUAL ;
     "group",          P.GROUP ;
+    "event",          P.EVENT ;
     "type",           P.TYPE ;
     "none",           P.NONE ;
     "inherit",        P.INHERIT ;
