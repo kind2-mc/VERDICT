@@ -222,7 +222,7 @@ let data_to_type_decls data_types data_impls =
 let aadl_dir_to_iml_mode = function
   | AD.In -> VI.In
   | AD.Out -> VI.Out
-  | AD.InOut -> failwith "Input-Output ports are not supported"
+  | AD.InOut -> VI.Out (* failwith "Input-Output ports are not supported" *)
 
 let aadl_port_to_iml_port type_decls {AD.name; AD.dir; AD.dtype; AD.properties } =
   {VI.name = C.get_id name;
@@ -1020,7 +1020,7 @@ let get_conn_type_prop_value properties =
 let port_connection_to_iml_connection ct ct_idx sys_impl iml_comp_types subcomps
   { AD.name; AD.dir; AD.src; AD.dst; AD.properties }
 =
-  assert (dir = AD.Unidirectional);
+  (* assert (dir = AD.Unidirectional); *)
   {VI.name = C.get_id name;
    VI.ftype = get_flow_type_prop_value properties;
    VI.conn_type = get_conn_type_prop_value properties;
