@@ -200,6 +200,17 @@ system_type:
 sys_features_section:
   | { [] }
   | FEATURES NONE ";" { [] }
+  | FEATURES fs = sys_feature_list { fs }
+
+sys_feature_list:
+  | dp = data_port { [dp] }
+  | ep = event_port { [ep] }
+  | dp = data_port; fs =  sys_feature_list { dp :: fs } 
+  | ep = event_port; fs =  sys_feature_list { ep :: fs }
+  | data_access { [] }
+  | data_access; fs =  sys_feature_list { fs }
+
+(*
   | FEATURES fs = nonempty_list(sys_feature) { fs }
 
 sys_feature:
@@ -219,6 +230,7 @@ sys_feature:
     }
   }
   (* INCOMPLETE *)
+*)
 
 data_port:
   pid = port_id; pdir = port_direction; EVENT? DATA PORT
