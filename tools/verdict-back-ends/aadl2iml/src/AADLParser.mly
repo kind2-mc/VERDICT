@@ -409,7 +409,16 @@ qcref:
 sys_connections_section:
   | { [] }
   | CONNECTIONS NONE ";" { [] }
-  | CONNECTIONS cs = nonempty_list(sys_connection) { cs }
+  | CONNECTIONS cs = sys_connection_list { cs }
+
+sys_connection_list:
+  | c = sys_connection
+  { [ c ] }
+  | access_connection { [] }
+  | c = sys_connection; cs = sys_connection_list
+  { c :: cs }
+  | access_connection; cs = sys_connection_list
+  { cs }
 
 sys_connection:
   | pc = port_connection { pc }
